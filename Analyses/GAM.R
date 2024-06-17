@@ -1,7 +1,7 @@
 # this file provides the codes for GAM main analyses(O3-adjusted model)
-# For single-factor model, just delete the O3 covariant (delete "+cb.coplt3" from line 22, 73, 123) 
+# For single-factor model, just delete the O3 covariant (delete "+cb.coplt3" from line 22, 76, 128) 
 # 99.9%: 3.29; 99%: 2.58
-library(tidyverse); library(dlnm);
+library(tidyverse); library(dlnm);library(scales)
 library(lubridate); library(tsModel);library(ggsci)
 library(mgcv); library(scales); library(splines)
 
@@ -26,7 +26,10 @@ FTjust <- function(dis, plt, coplt1, coplt2,df_t, coplt3){
         as.factor(dow)+as.factor(holiday),
         family=quasipoisson(link = 'log'), data=data)", sep='')))
   
-  iqr<-10
+  iqr <- data %>%
+    pull(!!sym(plt)) %>%
+    IQR(na.rm = TRUE)
+  
   eval(parse(text=paste("pred <- crosspred(cb.plt, model,
                         at=iqr, cumul=TRUE)",sep='')))
   matRRfit <- data.frame(fit = "matfit", dis = dis, plt = plt, iqr=iqr,
@@ -77,9 +80,11 @@ FTjust <- function(dis, plt, coplt1, coplt2,df_t, coplt3){
         as.factor(dow)+as.factor(holiday),
         family=quasipoisson(link = 'log'),  data=data)", sep='')))
   
-  iqr<-mean(data[["temp"]],na.rm=TRUE)
+  iqr <- data %>%
+    pull(!!sym(coplt1)) %>%
+    IQR(na.rm = TRUE)
   eval(parse(text=paste("pred <- crosspred(cb.plt, model,
-                        at=iqr+1, cumul=TRUE)",sep='')))
+                        at=iqr+17.5, cumul=TRUE)",sep='')))
   matRRfit <- data.frame(fit = "matfit", dis = dis, plt = "temp", iqr=iqr,
                          coplt = coplt3,df_t=df_t,
                          pred$matfit, stringsAsFactors = FALSE)
@@ -127,10 +132,12 @@ FTjust <- function(dis, plt, coplt1, coplt2,df_t, coplt3){
         as.factor(dow)+as.factor(holiday),
         family=quasipoisson(link = 'log'), data=data)", sep='')))
   
-  iqr<-mean(data[["rh"]],na.rm=TRUE)
+  iqr <- data %>%
+    pull(!!sym(coplt2)) %>%
+    IQR(na.rm = TRUE)
   
   eval(parse(text=paste("pred <- crosspred(cb.plt, model,
-                        at=10+iqr, cumul=TRUE)",sep='')))
+                        at=60+iqr, cumul=TRUE)",sep='')))
   matRRfit <- data.frame(fit = "matfit", dis = dis, plt = "rh", iqr=iqr,
                          coplt = coplt3,df_t=df_t,
                          pred$matfit, stringsAsFactors = FALSE)
@@ -169,45 +176,66 @@ output <- rbind(output1, output2, output3)
 names(output) <- c("dis","plt","iqr","coplt","df_t","lagA","beta","h","l","lag","Significance")
 
 output$lag <- factor(output$lag)
-
 output$Significance <- factor(output$Significance,levels = c(0,1),labels = c("Non-sig","Sig"))
 
+output <- output %>%
+  mutate(
+    beta = if_else(plt == "temp", beta / 5, beta),
+    h = if_else(plt == "temp", h / 5, h),
+    l = if_else(plt == "temp", l / 5, l)
+  )
+
 output$Coplt <- output$coplt
-output$plt <- factor(output$plt,levels = c("o3h8max","co","fsp","no2","temp","rh"),labels = c("O3","CO","PM2.5","NO2","Temp","RH"))
-output$df_t <- factor(output$df_t)
+output$plt <- factor(output$plt, levels=c("o3h8max","co","fsp","no2","temp","rh"),
+                     labels = c(expression(paste("O"[3],sep = " ")),
+                                expression(paste("CO",sep = " ")),
+                                expression(paste("PM"[2.5],sep = " ")),
+                                expression(paste("NO"[2],sep = " ")),
+                                expression(paste("Temp",sep = " ")),
+                                expression(paste("Humid",sep = " "))))
 
-P2_2 <- ggplot(output, aes(lag,beta,ymin = l, ymax = h, group=control)) +
-  geom_hline(yintercept = 0,linetype='dashed') +
-  geom_errorbar(aes(group = plt, col = plt, width=0), 
-                size=1, position = position_dodge((width=0.5))) +
-  scale_color_jama()+
-  geom_point(aes(group = plt, col = plt,shape=Significance),size = 2, 
-             position = position_dodge(width=0.5),,fontface = "bold") +
-  scale_shape_manual(values = c(16,8)) +
-  facet_wrap(~plt,scales='free',labeller = "label_parsed",ncol = 3 ) +
-  ylab(expression(paste(beta,"(Risk estimates air pollutants → COPD)", sep = "")))+
-  xlab("Lag")+  
-  theme_bw() +
-  theme(axis.text.x=element_text(size = 12, color= "black"),
-        axis.text.y=element_text(size = 12, color= "black"),
-        axis.title.x=element_text(size=14),
-        axis.title.y=element_text(size=14),
-        axis.ticks.length=unit(0.2,'cm'),
-        axis.line = element_line(colour = "black"),
-        legend.position=c("bottom"),
-        legend.title = element_blank(),
-        legend.text = element_text(size=12),
-        legend.box="vertical",
-        legend.margin=margin(-15,unit="pt"),
-        legend.box.spacing = margin(15.5),
-        legend.background = element_rect(fill="transparent"),
-        strip.background = element_rect(
-          color = "white", fill = "white"),
-        panel.border = element_blank(),
-        legend.key = element_rect(fill = "transparent"),
-        strip.text = element_text(size = 14),
-        panel.grid = element_blank(),
-        plot.title = element_text(size = 18, hjust=0.5))
-P2_2        
 
-  
+color_values <- c('gray20', "#d62728") 
+output$lag <- as.numeric(output$lag)
+
+P2_2 <- ggplot(output, aes(lag, beta, ymin = l, ymax = h)) +  
+  geom_hline(yintercept = 0, linetype = 'dashed', color = "black", size = 0.8) +
+  geom_ribbon( fill = "gray70", color = NA, alpha = 0.6) +  
+  geom_point(aes(shape = factor(Significance),col = Significance, shape = Significance), size = 2, stroke = 1.5, alpha=0.7) +  
+  geom_line(col="darkgray") +
+  geom_errorbar(data = subset(output, Significance == "Sig"), 
+                aes(ymin = l, ymax = h), 
+                width = 0.2, 
+                color = "#d62728", 
+                size = 0.8) +  
+  scale_color_manual(values = color_values) +
+  scale_shape_manual(values = c(16, 8)) +
+  scale_y_continuous(labels = label_number(accuracy = 0.01)) +
+  facet_wrap(~plt, scales = 'fixed', labeller = label_parsed, ncol = 6) +
+  ylab(expression(paste("Risk estimates β (env → COPD)", sep = ""))) +
+  scale_x_continuous(breaks = unique(output$lag), labels = c(0:6)) +
+  xlab("Lag") +
+  theme_minimal(base_size = 14) + 
+  theme(
+    axis.text.x = element_text(size = 12, color = "black"),
+    axis.text.y = element_text(size = 12, color = "black"),
+    axis.title.x = element_text(size = 14, margin = margin(t = 10)),
+    axis.title.y = element_text(size = 14, margin = margin(r = 10)),
+    axis.ticks.length = unit(0.2, 'cm'),
+    axis.line = element_line(colour = "black"),
+    legend.position = "None",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 12),
+    legend.box = "vertical",
+    legend.margin = margin(-15, unit = "pt"),
+    legend.box.spacing = unit(10, "pt"),
+    legend.background = element_rect(fill = "transparent"),
+    legend.key = element_rect(fill = "transparent"),
+    strip.background = element_rect(color = "white", fill = "white"),
+    strip.text = element_text(size = 14),
+    panel.grid.major = element_line(color = "gray90", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, hjust = 0.5, face = "bold")
+  )
+
+P2_2
