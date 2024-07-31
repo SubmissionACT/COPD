@@ -239,3 +239,4 @@ P2_2 <- ggplot(output, aes(lag, beta, ymin = l, ymax = h)) +
   )
 
 P2_2
+    

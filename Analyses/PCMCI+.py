@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[4]:
+# In[3]:
 
 
 #!/usr/bin/env python
@@ -15,7 +15,7 @@ import os
 import pyarrow.feather as feather
 from matplotlib import pyplot as plt
 from tigramite import data_processing as pp
-from tigramite import plotting as tp
+from tigramite import plotting2 as tp
 from tigramite.pcmci import PCMCI
 from tigramite.independence_tests import ParCorr
 import numpy as np
@@ -26,8 +26,8 @@ data_all.rename(columns={'copd': r'$COPD$',
                           'o3h8max': r'$O_{3}$',
                           'fsp': r'$PM_{2.5}$',
                           'no2': r'$NO_{2}$',
-                         'temp': r'$Temp.$',
-                         'rh': r'$Humid.$'}, inplace=True)
+                         'temp': r'$Temp$',
+                         'rh': r'$Humid$'}, inplace=True)
 data_all
 
 
@@ -90,14 +90,14 @@ def get_selected_links(var_names, tau_min, tau_max):
         season_idx = None
 
     # Get index of the temperature variable, if it exists
-    if r'$Temp.$' in var_names:
-        temp_idx = np.argwhere(np.array(var_names) == r'$Temp.$')[0, 0]
+    if r'$Temp$' in var_names:
+        temp_idx = np.argwhere(np.array(var_names) == r'$Temp$')[0, 0]
     else:
         temp_idx = None
 
     # Get index of the humidity variable, if it exists
-    if r'$Humid.$' in var_names:
-        humid_idx = np.argwhere(np.array(var_names) == r'$Humid.$')[0, 0]
+    if r'$Humid$' in var_names:
+        humid_idx = np.argwhere(np.array(var_names) == r'$Humid$')[0, 0]
     else:
         humid_idx = None
 
@@ -117,14 +117,14 @@ def get_selected_links(var_names, tau_min, tau_max):
                                    for tau in range(tau_min, tau_max + 1) if other_var != r'$COPD$']
             
             
-        elif var == r'$Humid.$':
+        elif var == r'$Humid$':
             # Humiditiy may be influenced by itself at all lags
             selected_links[idx] = [(idx, -tau) for tau in range(tau_min, tau_max + 1)]
 
             # Humidity may also be influenced by temperature
             selected_links[idx] = [(temp_idx, -tau) for tau in range(max(1, tau_min), tau_max + 1)]
 
-        elif var == r'$Temp.$':
+        elif var == r'$Temp$':
             # Temperature may be influenced by itself at all lags
             selected_links[idx] = [(idx, -tau) for tau in range(tau_min, tau_max + 1)]
 
@@ -201,7 +201,7 @@ def apply_pcmci(data_all,
         link_colorbar_label='cross-MCI (edges)',
         node_colorbar_label='auto-MCI (nodes)',
         node_aspect=1,
-        node_size=0.35,
+        node_size=0.3,
         label_fontsize=11,
         network_lower_bound=0.2,
         show_colorbar=1
@@ -231,13 +231,18 @@ def apply_pcmci(data_all,
     return results
 
 
+
+
+# In[4]:
+
+
 # In[2]:
 
 
 pc_alpha = 0.001
 results = apply_pcmci(data_all=data_all,
                       var_names=[r'$COPD$', r'$O_{3}$',r'$PM_{2.5}$',r'$NO_{2}$',r'$CO$',
-                                 r'$Temp.$',r'$Humid.$'
+                                 r'$Temp$',r'$Humid$'
                                     ],
                       season="Year",
                       tau_min=0,
